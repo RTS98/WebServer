@@ -6,18 +6,20 @@ import java.util.StringTokenizer;
 
 public class WebServer extends Thread {
 	protected Socket clientSocket;
+	private static WebServer instance = null;
 	private static final String INDEX = "C:\\Users\\stoiar\\Desktop\\WebServer\\html\\index.html";
 	private static final String ERROR = "C:\\Users\\stoiar\\Desktop\\WebServer\\html\\error.html";
 	private static final String STOPPED = "C:\\Users\\stoiar\\Desktop\\WebServer\\html\\stopped.html";
 	private static final String MAINTENANCE = "C:\\Users\\stoiar\\Desktop\\WebServer\\html\\maintenance.html";
-	private static int status = 2;
+	private static int status = 1;
+
+	public WebServer(Socket clientSocket) {
+		this.clientSocket = clientSocket;
+		start();
+	}
 
 	public static int getStatus() {
 		return status;
-	}
-
-	public Socket getClientSocket() {
-		return clientSocket;
 	}
 
 	public static String getERROR() {
@@ -34,6 +36,14 @@ public class WebServer extends Thread {
 
 	public static String getINDEX() {
 		return INDEX;
+	}
+
+	public int getClientSocket(){
+		return clientSocket.getLocalPort();
+	}
+
+	public void setStatus(int val){
+		status = val;
 	}
 
 	public static void main(String[] args) throws IOException {
@@ -64,11 +74,6 @@ public class WebServer extends Thread {
 		}
 	}
 
-	public WebServer(Socket clientSoc) {
-		clientSocket = clientSoc;
-		start();
-	}
-
 	public void run() {
 		System.out.println("New Communication Thread Started");
 		try {
@@ -92,9 +97,8 @@ public class WebServer extends Thread {
 			if(status == 1) {
 				Running(out, method, requestedFile);
 			}
-
 			if(status == 2){
-				Stopped(out);
+				Stopped(out, method, requestedFile);
 			}
 
 			if(status == 3){
@@ -114,6 +118,7 @@ public class WebServer extends Thread {
 		try{
 			if(method.equals("GET")){
 				if(requestedFile.endsWith("/") || requestedFile.endsWith("index.html") ){
+					setStatus(1);
 					File file = new File(INDEX);
 					//creez vectorul pentru a stoca datele din fisier
 					byte[] fileData = new byte[(int)file.length()];
@@ -130,22 +135,27 @@ public class WebServer extends Thread {
 					out.println(fileContent);
 					out.close();
 				}
-				else{
-					File file = new File(ERROR);
-					//creez vectorul pentru a stoca datele din fisier
-					byte[] fileData = new byte[(int)file.length()];
-					FileInputStream inFile = new FileInputStream(file);
-					inFile.read(fileData);
+				else {
+					if (requestedFile.endsWith("stopped.html")) {
+						setStatus(2);
+						Stopped(out,method,requestedFile);
+					} else {
+						File file = new File(ERROR);
+						//creez vectorul pentru a stoca datele din fisier
+						byte[] fileData = new byte[(int) file.length()];
+						FileInputStream inFile = new FileInputStream(file);
+						inFile.read(fileData);
 
-					out.println("HTTP/1.1 404 File Not Found");
-					out.println("Content-Type: text/html");
-					out.println("\r\n");
-					out.flush();
-					inFile.close();
+						out.println("HTTP/1.1 404 File Not Found");
+						out.println("Content-Type: text/html");
+						out.println("\r\n");
+						out.flush();
+						inFile.close();
 
-					String responseFileContent = new String(fileData);
-					out.println(responseFileContent);
-					out.close();
+						String responseFileContent = new String(fileData);
+						out.println(responseFileContent);
+						out.close();
+					}
 				}
 			}
 		}catch (IOException e) {
@@ -178,23 +188,29 @@ public class WebServer extends Thread {
 		}
 	}
 
-	private void Stopped(PrintWriter out){
+	private void Stopped(PrintWriter out, String method, String requestedFile){
 		try{
-			File file = new File(STOPPED);
-			//creez vectorul pentru a stoca datele din fisier
-			byte[] fileData = new byte[(int)file.length()];
-			FileInputStream inFile = new FileInputStream(file);
-			inFile.read(fileData);
+			if(method.equals("GET")) {
+				if (requestedFile.endsWith("index.html")) {
+					setStatus(1);
+					Running(out, method, requestedFile);
+				}
+				File file = new File(STOPPED);
+				//creez vectorul pentru a stoca datele din fisier
+				byte[] fileData = new byte[(int) file.length()];
+				FileInputStream inFile = new FileInputStream(file);
+				inFile.read(fileData);
 
-			out.println("HTTP/1.1 522 Connection Timeout");
-			out.println("Content-Type: text/html");
-			out.println("\r\n");
-			out.flush();
-			inFile.close();
+				out.println("HTTP/1.1 522 Connection Timeout");
+				out.println("Content-Type: text/html");
+				out.println("\r\n");
+				out.flush();
+				inFile.close();
 
-			String responseFileContent = new String(fileData);
-			out.println(responseFileContent);
-			out.close();
+				String responseFileContent = new String(fileData);
+				out.println(responseFileContent);
+				out.close();
+			}
 
 		}catch(IOException e){
 			System.err.println("Problem with Communication Server");
